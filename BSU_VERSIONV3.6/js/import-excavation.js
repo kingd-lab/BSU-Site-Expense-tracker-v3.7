@@ -536,6 +536,29 @@
     btn.disabled = true;
     const done = new Set();
     let imported = 0;
+
+    // Snapshot what is already in the Expenses sheet. If a batch reaches the
+    // sheet but its reply never gets back to the browser, the app can't tell
+    // from the error whether that batch was saved. Comparing the sheet before
+    // and after tells it exactly which rows made it in, so nothing is sent twice.
+    const keyOf = (o) => [
+      String(o.Date || o.date || '').slice(0, 10),
+      String(o.Site || o.site || '').trim(),
+      String(o.Category || o.category || '').trim(),
+      String(o.Description || o.description || '').trim(),
+      Number(o.Amount !== undefined ? o.Amount : o.amount) || 0
+    ].join('|');
+    const countKeys = (list) => {
+      const m = {};
+      list.forEach(o => { const k = keyOf(o); m[k] = (m[k] || 0) + 1; });
+      return m;
+    };
+    let before = null;
+    try {
+      btn.textContent = 'Checking existing expenses…';
+      before = countKeys((await Api.getExpenses()).expenses || []);
+    } catch (e) { before = null; }
+
     try {
       for (const chunk of batches) {
         btn.textContent = `Importing ${Math.min(imported + chunk.length, items.length)}/${items.length}…`;
@@ -546,13 +569,32 @@
       showToast(`Imported ${imported} excavation project expenses successfully`, 'success');
       resetToUpload();
     } catch (err) {
-      const msg = `Imported ${imported} of ${items.length} rows, then it failed: ${err.message}. ` +
-        (imported > 0 ? 'The rows already saved have been removed from this list, so click Import All Rows again to continue with the rest.' : 'Nothing was saved.');
+      // Work out which rows really are in the sheet now (see snapshot above).
+      let savedRows = done;
+      if (before) {
+        try {
+          btn.textContent = 'Checking what was saved…';
+          const after = countKeys((await Api.getExpenses()).expenses || []);
+          const extra = {};
+          Object.keys(after).forEach(k => {
+            const d = after[k] - (before[k] || 0);
+            if (d > 0) extra[k] = d;
+          });
+          savedRows = new Set();
+          items.forEach(x => {
+            const k = keyOf(x.expense);
+            if (extra[k] > 0) { extra[k]--; savedRows.add(x.row); }
+          });
+        } catch (e2) { savedRows = done; }
+      }
+      const saved = savedRows.size;
+      const msg = `${saved} of ${items.length} rows were saved before it failed: ${err.message}. ` +
+        (saved > 0 ? 'Those rows have been removed from this list, so click Import All Rows again to continue with the rest.' : 'Nothing was saved.');
       status.textContent = msg;
       status.style.display = 'block';
       showToast(msg, 'error');
-      if (done.size) {
-        parsedRows = parsedRows.filter(r => !done.has(r));
+      if (saved) {
+        parsedRows = parsedRows.filter(r => !savedRows.has(r));
         renderReview();
       }
     } finally {
