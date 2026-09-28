@@ -32,7 +32,7 @@
     const t = document.getElementById('toast');
     t.textContent = msg;
     t.className = 'toast show' + (type ? ' ' + type : '');
-    setTimeout(() => t.classList.remove('show'), 3200);
+    setTimeout(() => t.classList.remove('show'), type === 'error' ? 15000 : 3200);
   }
 
   function money(n) {
@@ -485,50 +485,90 @@
       return `${r.description} [Excavation – ${r.column}]`;
     };
 
-    const expenses = parsedRows.map(r => ({
-      date: r.date,
-      site: r.site || defaultSite,
-      category: r.category,
-      description: linkedDescription(r),
-      quantity: '',
-      unit: '',
-      amount: Number(r.amount) || 0,
-      vendor: '',
-      paymentMethod: 'Cash'
-    })).filter(e => e.amount > 0);
+    // Pair each review row with the expense that will be sent for it, so
+    // rows that have already been saved can be removed from the review
+    // table if a later batch fails (Import can then just be clicked again
+    // without saving anything twice).
+    const items = parsedRows.map(r => ({
+      row: r,
+      expense: {
+        date: r.date,
+        site: r.site || defaultSite,
+        category: r.category,
+        description: linkedDescription(r),
+        amount: Number(r.amount) || 0,
+        paymentMethod: 'Cash'
+      }
+    })).filter(x => x.expense.amount > 0);
 
-    if (!expenses.length) {
+    if (!items.length) {
       showToast('Every row needs a non-zero amount', 'error');
       return;
     }
 
-    // Sent in chunks, same reasoning as Import Expenses: a write action
-    // goes through as a GET with the whole JSON body in one URL query
-    // parameter, and the Apps Script redirect has a hard size limit on
-    // that URL, so batches keep well under it.
-    const CHUNK_SIZE = 30;
+    // Batches hold up to 50 rows, but a write action goes through as a GET
+    // with the whole JSON body inside the URL, and Apps Script rejects URLs
+    // past roughly 10 KB. 50 of these rows come to about 13 KB, so each batch
+    // is filled row by row until it reaches 50 rows or the URL budget,
+    // whichever comes first (in practice about 30 rows). Empty fields are
+    // left out of the payload to fit as many rows as possible.
+    const MAX_ROWS = 50;
+    const MAX_URL_CHARS = 9000;
+    const urlLen = (list) => encodeURIComponent(JSON.stringify({
+      action: 'submitExpensesBulk',
+      token: localStorage.getItem('sems_token') || '',
+      expenses: list.map(x => x.expense)
+    })).length;
+    const batches = [];
+    let cur = [];
+    items.forEach(x => {
+      if (cur.length && (cur.length >= MAX_ROWS || urlLen(cur.concat([x])) > MAX_URL_CHARS)) {
+        batches.push(cur);
+        cur = [];
+      }
+      cur.push(x);
+    });
+    if (cur.length) batches.push(cur);
+
     const btn = document.getElementById('confirmImportBtn');
+    const status = ensureStatusBox();
+    status.style.display = 'none';
     btn.disabled = true;
+    const done = new Set();
     let imported = 0;
     try {
-      for (let i = 0; i < expenses.length; i += CHUNK_SIZE) {
-        const chunk = expenses.slice(i, i + CHUNK_SIZE);
-        btn.textContent = `Importing ${Math.min(i + CHUNK_SIZE, expenses.length)}/${expenses.length}…`;
-        const result = await Api.submitExpensesBulk(chunk);
+      for (const chunk of batches) {
+        btn.textContent = `Importing ${Math.min(imported + chunk.length, items.length)}/${items.length}…`;
+        const result = await Api.submitExpensesBulk(chunk.map(x => x.expense));
         imported += result.count;
+        chunk.forEach(x => done.add(x.row));
       }
       showToast(`Imported ${imported} excavation project expenses successfully`, 'success');
       resetToUpload();
     } catch (err) {
-      showToast(
-        imported > 0
-          ? `Imported ${imported} of ${expenses.length} before failing: ${err.message}`
-          : err.message,
-        'error'
-      );
+      const msg = `Imported ${imported} of ${items.length} rows, then it failed: ${err.message}. ` +
+        (imported > 0 ? 'The rows already saved have been removed from this list, so click Import All Rows again to continue with the rest.' : 'Nothing was saved.');
+      status.textContent = msg;
+      status.style.display = 'block';
+      showToast(msg, 'error');
+      if (done.size) {
+        parsedRows = parsedRows.filter(r => !done.has(r));
+        renderReview();
+      }
     } finally {
       btn.disabled = false; btn.textContent = 'Import All Rows';
     }
+  }
+
+  function ensureStatusBox() {
+    let box = document.getElementById('importStatus');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'importStatus';
+      box.style.cssText = 'display:none;margin:12px 0;padding:12px 14px;border-radius:8px;background:#FDECEA;color:#8A1F11;font-size:14px;';
+      document.querySelector('#reviewCard .form-actions').before(box);
+    }
+    return box;
   }
 
   init();
