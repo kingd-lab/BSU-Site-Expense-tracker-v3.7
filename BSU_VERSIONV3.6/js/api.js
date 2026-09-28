@@ -4,7 +4,7 @@
  * IMPORTANT: set API_URL to your deployed Apps Script Web App URL,
  * e.g. https://script.google.com/macros/s/AKfycb.../exec
  */
-const API_URL = 'https://script.google.com/macros/s/AKfycbyvEl2WHRz8-CTbIBHXIDpSC5zyGYcFjO4SggfQWxPj7ldHK7QneBXrNKD2BB6wPNO0/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbyvEl2WHRz8-CTbIBHXIDpSC5zyGYcFjO4SggfQWxPj7ldHK7QneBXrNKD2BB6wPNO0/execg';
 
 /**
  * parseLocalDate — the backend now always sends dates as plain
