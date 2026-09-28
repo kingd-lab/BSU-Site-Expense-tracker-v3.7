@@ -107,15 +107,15 @@
         const data = new Uint8Array(evt.target.result);
         const wb = XLSX.read(data, { type: 'array', cellDates: true });
 
-        // If the workbook has several tabs (e.g. the full daily & monthly
-        // report), only scan the ones that are plausibly excavation/concrete
-        // work — otherwise a Salary, Materials, or Block Setting tab would
-        // get pulled in as excavation expenses too. A single-sheet file is
-        // always scanned, since that's clearly the one meant for this import.
-        const SHEET_NAME_HINT = /trench|column|concrete|excavat/i;
+        // Every tab in this workbook belongs to the excavation project, so all
+        // daily-log tabs are imported (Trenches, Column Base, Block Setting,
+        // Hollow Filling, Materials, Salary / Allowance, Others). Only the
+        // roll-up tabs are skipped, because they repeat the same expenses and
+        // would double count them.
+        const SKIP_SHEET = /summary|detail|reconcil/i;
         let rows = [];
         wb.SheetNames.forEach(sheetName => {
-          if (wb.SheetNames.length > 1 && !SHEET_NAME_HINT.test(sheetName)) return;
+          if (SKIP_SHEET.test(sheetName)) return;
           const ws = wb.Sheets[sheetName];
           const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
           rows = rows.concat(parseSheet(aoa, sheetName));
@@ -173,7 +173,10 @@
           const specParts = [];
           header.specCols.forEach(sc => {
             const v = row[sc.col];
-            if (v !== '' && v !== null && v !== undefined) specParts.push(`${sc.label}: ${v}`);
+            if (v === '' || v === null || v === undefined) return;
+            // Qty of 1 is just the placeholder for a lump-sum line, so skip it.
+            if (/^(qty|quantity)/i.test(String(sc.label)) && Number(v) === 1) return;
+            specParts.push(`${sc.label}: ${v}`);
           });
           const description = specParts.length ? `${descRaw} (${specParts.join(', ')})` : descRaw;
           results.push(buildRow(dateVal, description, amount, sheetName));
@@ -261,16 +264,72 @@
       category: guess.category,
       confidence: badDate ? 'none' : guess.confidence,
       description,
-      amount
+      amount,
+      column: columnLabel(sheetName)
     };
   }
 
+  // ---------------------------------------------------------------
+  // Template columns -> categories
+  //
+  // The workbook's tabs are the project's own expense columns and all of
+  // them relate to the excavation job. Rows are never moved out of their
+  // tab's column by a keyword guess (e.g. Mason on the Column Base tab stays
+  // in the excavation/concrete family). Tabs the app has no matching
+  // category for (Block Setting, Salary, ...) use the keyword guess, and
+  // are stamped with an "[Excavation – <column>]" link in the description.
+  // ---------------------------------------------------------------
+  const EXC_FAMILY = ['Excavation of Trenches', 'Concrete Works'];
+  const isExcFamily = (cat) => EXC_FAMILY.indexOf(CATEGORY_GROUP_OF[cat]) !== -1;
+  const isConcrete = (cat) => CATEGORY_GROUP_OF[cat] === 'Concrete Works';
+
+  // Tab name -> the column name used in the template / summary sheet.
+  function columnLabel(sheetName) {
+    if (/salary/i.test(sheetName)) return 'Salary / Allowance';
+    return String(sheetName || '').trim();
+  }
+
+  // Fallback category (needs a look in review) for tabs with no in-app equivalent.
+  const SHEET_FALLBACK = [
+    [/block\s*setting/i, 'Workmanship (Other)'],
+    [/hollow/i, 'Workmanship (Other)'],
+    [/salary/i, 'General Labour'],
+    [/material/i, 'Miscellaneous'],
+    [/other/i, 'Miscellaneous']
+  ];
+
   function guessForRow(descriptionText, sheetName) {
     const guess = guessCategory(descriptionText);
+    const isMason = /\bmason\b|\bpoker\b/i.test(descriptionText);
+
+    // Mason / poker lines (except poker rent, which has its own category)
+    // always stay with the excavation concrete labour, even when the line
+    // also says "casting".
+    const masonLine = isMason && guess.category !== 'Poker Rental' && !/hammer/i.test(descriptionText);
+
+    // Trenches tab: stays Excavation of Trenches / Trenches Casting.
+    if (/trench/i.test(sheetName)) {
+      if (masonLine) return { category: 'Mason/Poker Labour', confidence: 'keyword' };
+      if (guess.confidence !== 'none' && isExcFamily(guess.category)) return guess;
+      return { category: 'Excavation of Trenches', confidence: 'keyword' };
+    }
+
+    // Column Base tab: everything stays in Column Base / Concrete Works.
+    if (/column/i.test(sheetName)) {
+      if (masonLine) return { category: 'Mason/Poker Labour', confidence: 'keyword' };
+      if (guess.confidence !== 'none' && isConcrete(guess.category)) return guess;
+      return { category: 'Column Base', confidence: 'keyword' };
+    }
+
+    // Any other tab. A mason hammer is a tool, not mason labour; sand being
+    // cleared away is labour, not a sand purchase.
+    if (/hammer/i.test(descriptionText)) return { category: 'Tool Purchase', confidence: 'keyword' };
+    if (guess.category === 'Sharp Sand' && /remov|evacuat|clear|cart/i.test(descriptionText)) {
+      return { category: 'General Labour', confidence: 'keyword' };
+    }
     if (guess.confidence !== 'none') return guess;
-    // No hit on the description alone — try the sheet/tab name as a
-    // last resort (e.g. a "Column Base" tab with terse row text).
-    return guessCategory(sheetName);
+    const fb = SHEET_FALLBACK.find(f => f[0].test(sheetName));
+    return { category: fb ? fb[1] : 'Miscellaneous', confidence: 'none' };
   }
 
   function normalizeDate(val) {
@@ -305,6 +364,24 @@
     document.getElementById('statMatched').textContent = matchedCount;
     document.getElementById('statFlagged').textContent = flaggedCount;
     document.getElementById('statTotal').textContent = money(total);
+
+    // Totals per template column, so they can be checked against the
+    // workbook's ALL EXPENSE SUMMARY tab.
+    let strip = document.getElementById('columnTotals');
+    if (!strip) {
+      strip = document.createElement('div');
+      strip.id = 'columnTotals';
+      strip.className = 'field-hint';
+      strip.style.marginBottom = '14px';
+      document.querySelector('#reviewCard .table-wrap').before(strip);
+    }
+    const byCol = {};
+    parsedRows.forEach(r => {
+      const c = byCol[r.column] || (byCol[r.column] = { n: 0, sum: 0 });
+      c.n++; c.sum += Number(r.amount) || 0;
+    });
+    strip.innerHTML = '<strong>Per column:</strong> ' + Object.keys(byCol)
+      .map(k => `${k} ${money(byCol[k].sum)} (${byCol[k].n})`).join(' · ');
 
     const tbody = document.getElementById('reviewRows');
     tbody.innerHTML = '';
@@ -395,11 +472,18 @@
       return;
     }
 
+    // A row whose category is outside Excavation of Trenches / Concrete Works
+    // carries a tag so it still traces back to the excavation job.
+    const linkedDescription = (r) => {
+      if (isExcFamily(r.category) || /\[Excavation/i.test(r.description)) return r.description;
+      return `${r.description} [Excavation – ${r.column}]`;
+    };
+
     const expenses = parsedRows.map(r => ({
       date: r.date,
       site: r.site || defaultSite,
       category: r.category,
-      description: r.description,
+      description: linkedDescription(r),
       quantity: '',
       unit: '',
       amount: Number(r.amount) || 0,
@@ -427,7 +511,7 @@
         const result = await Api.submitExpensesBulk(chunk);
         imported += result.count;
       }
-      showToast(`Imported ${imported} excavation/concrete works expenses successfully`, 'success');
+      showToast(`Imported ${imported} excavation project expenses successfully`, 'success');
       resetToUpload();
     } catch (err) {
       showToast(
