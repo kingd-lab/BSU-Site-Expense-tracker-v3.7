@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -51,14 +51,13 @@
     </div>
 
     <div class="field-hint">
-      Built for the daily log format — a "Date / Description / Qty (or Cubic/Bags) / Rate / Amount" table per day,
-      with a "DAY TOTAL" row closing each day (e.g. the <strong>Trenches</strong> and <strong>Column Base</strong>
-      tabs of the daily &amp; monthly report). If your file has several tabs, only the ones that look like
-      trench/column/excavation/concrete work are scanned — Salary, Materials, Block Setting, etc. are left alone.
-      Rows are automatically sorted into <strong>Excavation of Trenches</strong> (digging) or
-      <strong>Concrete Works</strong> (casting, column base, etc.) from the description text — the same matching
-      used by Add Expense and Import Expenses — so flag anything that looks wrong in the review step below. A
-      plain Date/Description/Amount table also works.
+      Built for the excavation project workbook — one tab per column (Trenches, Column Base, Block Setting,
+      Hollow Filling, Materials, Salary / Allowance, Others), each with a "Date / Description / Qty / Rate / Amount"
+      table per day and a "DAY TOTAL" row closing each day. Every daily-log tab is imported; the summary, detail and
+      reconciliation tabs are skipped so nothing is counted twice. Trenches and Column Base rows stay in the
+      excavation / concrete works categories. Rows on the other tabs are matched by description, and any row that
+      lands outside Excavation of Trenches / Concrete Works gets an "[Excavation – tab name]" tag added to its
+      description so it stays linked to the excavation job. A plain Date/Description/Amount table also works.
     </div>
 
     <div class="form-actions">
