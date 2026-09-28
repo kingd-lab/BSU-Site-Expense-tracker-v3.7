@@ -289,13 +289,17 @@
     return String(sheetName || '').trim();
   }
 
-  // Fallback category (needs a look in review) for tabs with no in-app equivalent.
-  const SHEET_FALLBACK = [
-    [/block\s*setting/i, 'Workmanship (Other)'],
-    [/hollow/i, 'Workmanship (Other)'],
-    [/salary/i, 'General Labour'],
-    [/material/i, 'Miscellaneous'],
-    [/other/i, 'Miscellaneous']
+  // Extra rules for the Materials / Others tabs, checked before the general
+  // keyword list, so each line lands in its own category (granite, sand,
+  // tools, transport ...) instead of being caught by a word like "casting".
+  const OTHER_TAB_RULES = [
+    [/hammer|shovel|digger purchase/i, 'Tool Purchase'],
+    [/geepee|spirit level|^line\b/i, 'Setting Out Materials'],
+    [/termite/i, 'Chemical'],
+    [/granite/i, 'Granite'],
+    [/sand/i, 'Sharp Sand'],
+    [/\bhouse\b|furniture/i, 'House Setup Materials'],
+    [/photocopy|drawing/i, 'Office Supplies']
   ];
 
   function guessForRow(descriptionText, sheetName) {
@@ -310,7 +314,8 @@
     // Trenches tab: stays Excavation of Trenches / Trenches Casting.
     if (/trench/i.test(sheetName)) {
       if (masonLine) return { category: 'Mason/Poker Labour', confidence: 'keyword' };
-      if (guess.confidence !== 'none' && isExcFamily(guess.category)) return guess;
+      const ownBlock = guess.category === 'Block Setting' || guess.category === 'Hollow Filling';
+      if (guess.confidence !== 'none' && isExcFamily(guess.category) && !ownBlock) return guess;
       return { category: 'Excavation of Trenches', confidence: 'keyword' };
     }
 
@@ -321,15 +326,16 @@
       return { category: 'Column Base', confidence: 'keyword' };
     }
 
-    // Any other tab. A mason hammer is a tool, not mason labour; sand being
-    // cleared away is labour, not a sand purchase.
-    if (/hammer/i.test(descriptionText)) return { category: 'Tool Purchase', confidence: 'keyword' };
-    if (guess.category === 'Sharp Sand' && /remov|evacuat|clear|cart/i.test(descriptionText)) {
-      return { category: 'General Labour', confidence: 'keyword' };
-    }
+    // Template columns that have their own category in the app.
+    if (/block\s*setting/i.test(sheetName)) return { category: 'Block Setting', confidence: 'keyword' };
+    if (/hollow/i.test(sheetName)) return { category: 'Hollow Filling', confidence: 'keyword' };
+    if (/salary/i.test(sheetName)) return { category: 'Salary / Allowance', confidence: 'keyword' };
+
+    // Materials / Others: each line goes to its own category.
+    const rule = OTHER_TAB_RULES.find(r => r[0].test(descriptionText));
+    if (rule) return { category: rule[1], confidence: 'keyword' };
     if (guess.confidence !== 'none') return guess;
-    const fb = SHEET_FALLBACK.find(f => f[0].test(sheetName));
-    return { category: fb ? fb[1] : 'Miscellaneous', confidence: 'none' };
+    return { category: 'Miscellaneous', confidence: 'none' };
   }
 
   function normalizeDate(val) {
