@@ -37,7 +37,9 @@ const CATEGORY_GROUPS = {
   'Accommodation': ['Hotel Accommodation', 'House Rent', 'House Cleaning', 'House Setup Materials'],
   'Block Production': ['Store Construction', 'Cement', 'Burnt Bricks', 'Water Supply', 'Sharp Sand', 'plaster Sand','Block Moulding Labour', 'Block Production'],
   'Main Work': ['Chemical', 'Setting Out Materials', 'Security', 'PPE & Safety Equipment', 'Granite', 'Site Office'],
-  'Excavation of Trenches': ['Excavation of Trenches', 'Excavation Equipment Hire'],
+  // Block Setting and Hollow Filling are the site team's own columns for work done in the
+  // excavation/foundation phase, so they count as Excavation (and in the excavation totals).
+  'Excavation of Trenches': ['Excavation of Trenches', 'Excavation Equipment Hire', 'Block Setting', 'Hollow Filling'],
   'Concrete Works': [
     'Column Blinding', 'Column Base', 'Trenches Casting', 'Columns Before Slab', 'Slab',
     'Kickers', 'Column on Slab', 'Lintel', 'Beams & First Floor Slab', 'First Floor Columns',
@@ -51,7 +53,7 @@ const CATEGORY_GROUPS = {
     'Electrical Materials', 'Doors & Windows', 'Glass & Aluminium', 'Blocks', 'Bricks',
     'Generator Fuel', 'Diesel', 'Petrol', 'Internet & Communication',
     'Equipment Hire', 'Machinery Repair', 'Tool Purchase', 'Haulage', 'Loading & Offloading',
-    'Site Cleaning', 'Office Supplies', 'Waste Disposal', 'Miscellaneous'
+    'Site Cleaning', 'Office Supplies', 'Waste Disposal', 'Salary / Allowance', 'Miscellaneous'
   ]
 };
 
@@ -100,6 +102,10 @@ const CATEGORY_KEYWORDS = [
   ['security', 'Security'], ['guard', 'Security'], ['watchman', 'Security'],
   ['ppe', 'PPE & Safety Equipment'], ['safety', 'PPE & Safety Equipment'], ['helmet', 'PPE & Safety Equipment'], ['boot', 'PPE & Safety Equipment'],
   ['site office', 'Site Office'],
+  ['hollow fill', 'Hollow Filling'], ['hollow', 'Hollow Filling'],
+  ['block setting', 'Block Setting'], ['blockwork', 'Block Setting'], ['block work', 'Block Setting'],
+  ['block laying', 'Block Setting'],
+  ['salary', 'Salary / Allowance'], ['allowance', 'Salary / Allowance'],
 
   // --- Concrete Works: most specific / unique phrasing first ---
   ['first floor lintel', 'First Floor Lintel'],
