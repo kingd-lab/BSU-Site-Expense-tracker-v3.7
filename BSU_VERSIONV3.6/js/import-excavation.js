@@ -160,7 +160,15 @@
         if (/^day total$/i.test(descRaw)) { j++; continue; }
 
         const dateVal = row[header.dateCol];
-        const amount = Number(row[header.amountCol]) || 0;
+        // Amount cells are often formulas (=Qty*Rate). If the file was saved
+        // by a tool that doesn't store calculated results, the cell reads as
+        // empty here, so rebuild the amount from Qty x Rate instead of 0.
+        let amount = toNumber(row[header.amountCol]);
+        if (!amount && header.rateCol !== -1) {
+          const rate = toNumber(row[header.rateCol]);
+          const qtyRaw = header.qtyCol !== -1 ? toNumber(row[header.qtyCol]) : 0;
+          amount = rate * (qtyRaw || 1);
+        }
         if (dateVal !== '' && dateVal !== null && dateVal !== undefined && descRaw) {
           const specParts = [];
           header.specCols.forEach(sc => {
@@ -204,7 +212,14 @@
       if (!lower[c]) continue;
       specCols.push({ col: c, label: row[c] });
     }
-    return { dateCol, descCol, amountCol, specCols };
+    const qtyCol = lower.findIndex((c, idx) => idx > descCol && idx < amountCol && /^(qty|quantity)/.test(c));
+    return { dateCol, descCol, amountCol, rateCol, qtyCol, specCols };
+  }
+
+  function toNumber(v) {
+    if (typeof v === 'number') return isFinite(v) ? v : 0;
+    const n = Number(String(v ?? '').replace(/[₦,\s]/g, ''));
+    return isFinite(n) ? n : 0;
   }
 
   function isBlankRow(row) {
@@ -235,11 +250,16 @@
 
   function buildRow(dateVal, description, amount, sheetName) {
     const guess = guessForRow(description, sheetName);
+    const date = normalizeDate(dateVal);
+    // A mistyped date like "9/25/206" parses as year 206 — flag the row
+    // amber so it gets fixed in the review table instead of importing.
+    const year = Number(date.slice(0, 4));
+    const badDate = year < 2020 || year > 2100;
     return {
-      date: normalizeDate(dateVal),
+      date,
       site: '',
       category: guess.category,
-      confidence: guess.confidence,
+      confidence: badDate ? 'none' : guess.confidence,
       description,
       amount
     };
