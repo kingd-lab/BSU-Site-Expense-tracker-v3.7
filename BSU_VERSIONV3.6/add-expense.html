@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>
+  // Applied before first paint to avoid a flash of the wrong theme.
+  (function () {
+    var stored = localStorage.getItem('sems_theme');
+    var theme = stored || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  })();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Add Expense — Site Expense Manager</title>
+<link rel="icon" type="image/png" href="assets/img/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/login.css">
+<link rel="stylesheet" href="css/forms.css">
+</head>
+<body>
+
+<template id="pageContent">
+  <div class="mobile-topbar">
+    <button id="menuBtn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+    <strong>Site Expense</strong>
+    <span></span>
+  </div>
+
+  <div class="topbar">
+    <div>
+      <h1>Add Expense</h1>
+      <div class="sub" id="siteSub">Log a new expense for your site</div>
+    </div>
+  </div>
+
+  <div class="card expense-form">
+    <div class="confirm-note">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 21h20L12 2z"/><path d="M12 9v5M12 17h.01"/></svg> Once submitted, this expense becomes permanent. It cannot be edited or deleted by you — please double-check the details before saving.
+    </div>
+
+    <div class="login-error" id="formError"></div>
+
+    <form id="expenseForm">
+      <div class="form-grid">
+        <div class="field">
+          <label for="date">Date</label>
+          <input type="date" id="date" required>
+        </div>
+        <div class="field">
+          <label for="category">Category</label>
+          <select id="category" required></select>
+        </div>
+        <div class="field span-2">
+          <label for="description">Description</label>
+          <input type="text" id="description" placeholder="e.g. 50 bags of dangote cement" required>
+        </div>
+        <div class="field">
+          <label for="quantity">Quantity</label>
+          <input type="number" id="quantity" min="0" step="any" placeholder="Optional">
+        </div>
+        <div class="field">
+          <label for="unit">Unit</label>
+          <input type="text" id="unit" placeholder="e.g. bags, hrs, trips">
+        </div>
+        <div class="field">
+          <label for="amount">Amount (₦)</label>
+          <input type="number" id="amount" min="0" step="0.01" required>
+        </div>
+        <div class="field">
+          <label for="vendor">Vendor / Supplier</label>
+          <input type="text" id="vendor" placeholder="Optional">
+        </div>
+        <div class="field">
+          <label for="paymentMethod">Payment Method</label>
+          <select id="paymentMethod">
+            <option value="Cash">Cash</option>
+            <option value="Bank Transfer">Bank Transfer</option>
+            <option value="POS">POS / Card</option>
+            <option value="Cheque">Cheque</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="field span-2">
+          <label for="receiptUrl">Receipt (link, optional)</label>
+          <input type="text" id="receiptUrl" placeholder="Paste a Google Drive / photo link if you have one">
+          <div class="field-hint">Tip: upload the receipt photo to Drive and paste the shareable link here.</div>
+        </div>
+        <div class="field span-2">
+          <label for="remarks">Remarks</label>
+          <textarea id="remarks" rows="3" placeholder="Optional notes"></textarea>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <a href="javascript:history.back()" class="btn btn-ghost">Cancel</a>
+        <button type="submit" class="btn btn-accent" id="submitBtn">Submit Expense</button>
+      </div>
+    </form>
+  </div>
+</template>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/theme.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/categories.js"></script>
+<script src="js/expense.js"></script>
+</body>
+</html>

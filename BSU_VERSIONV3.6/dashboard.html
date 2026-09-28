@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>
+  // Applied before first paint to avoid a flash of the wrong theme.
+  (function () {
+    var stored = localStorage.getItem('sems_theme');
+    var theme = stored || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  })();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard — Site Expense Manager</title>
+<link rel="icon" type="image/png" href="assets/img/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+</head>
+<body>
+
+<template id="pageContent">
+  <div class="mobile-topbar">
+    <button id="menuBtn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+    <strong>Site Expense</strong>
+    <span></span>
+  </div>
+
+  <div class="topbar">
+    <div>
+      <h1>Admin Dashboard</h1>
+      <div class="sub">Every site, every transaction, in one place</div>
+    </div>
+    <div class="export-row">
+      <a href="add-expense.html" class="btn btn-outline"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Expense</a>
+      <a href="report.html" class="btn btn-primary"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M12 20V4M20 20v-7"/></svg> Full Reports</a>
+    </div>
+  </div>
+
+  <div class="card" id="lastImportCard" style="display:none; margin-bottom:20px;">
+    <div class="card-head"><h3>Last Imported (main app cutoff)</h3></div>
+    <p style="font-size:12.5px;color:var(--color-ink-muted);margin-bottom:12px;">
+      Check this before importing a new file from Ilesanmi or your Cash Book — anything dated on or
+      before these cutoffs is already in the app. Only bring in rows dated after this.
+    </p>
+    <div class="preview-box">
+      <div class="preview-row"><span>Latest Expense date (site reports / Excavation, Concrete Works, etc.)</span><strong id="lastExpenseDate">\u2014</strong></div>
+      <div class="preview-row"><span>Latest Cash Book entry date</span><strong id="lastCashBookDate">\u2014</strong></div>
+    </div>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card"><div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Total Expenses (All Time)</div><div class="value primary" id="statAllTime" style="font-size:22px;">—</div></div>
+    <div class="stat-card"><div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg> Total Today</div><div class="value" id="statToday">—</div></div>
+    <div class="stat-card"><div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg> Monthly Expenses</div><div class="value" id="statMonth">—</div></div>
+    <div class="stat-card"><div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l9 5-9 5-9-5 9-5z"/><path d="M3 12l9 5 9-5M3 17l9 5 9-5"/></svg> Total Sites</div><div class="value accent" id="statSites">—</div></div>
+    <div class="stat-card"><div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8M8 9h2"/></svg> Total Transactions</div><div class="value" id="statCount">—</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>All Expenses</h3>
+    </div>
+    <div class="filter-row">
+      <input type="text" id="searchBox" placeholder="Search description, vendor…">
+      <select id="siteFilter"><option value="">All sites</option></select>
+      <select id="categoryFilter"><option value="">All categories</option></select>
+      <input type="date" id="fromDate">
+      <input type="date" id="toDate">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Expense ID</th><th>Date</th><th>Site</th><th>Category</th><th>Description</th>
+            <th>Amount</th><th>Vendor</th><th>Payment</th><th>Submitted By</th>
+          </tr>
+        </thead>
+        <tbody id="expenseRows"></tbody>
+      </table>
+      <div class="empty-state" id="emptyState" style="display:none;">
+        <div class="icon"><svg class="ico ico-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg></div><div>No expenses match your filters.</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="users" class="card">
+    <div class="card-head">
+      <h3>Users</h3>
+      <button class="btn btn-outline" id="addUserBtn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add User</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Username</th><th>Role</th><th>Site</th></tr></thead>
+        <tbody id="userRows"></tbody>
+      </table>
+    </div>
+
+    <div id="addUserForm" style="display:none; margin-top:18px; border-top:1px solid var(--color-border); padding-top:16px;">
+      <div class="form-grid">
+        <div class="field"><label>Username</label><input type="text" id="newUsername"></div>
+        <div class="field"><label>Temporary Password</label><input type="text" id="newPassword"></div>
+        <div class="field">
+          <label>Role</label>
+          <select id="newRole">
+            <option value="Site Manager">Site Manager</option>
+            <option value="Admin">Admin</option>
+            <option value="Boss">Boss</option>
+          </select>
+        </div>
+        <div class="field"><label>Site (or ALL)</label><input type="text" id="newSite" placeholder="e.g. Lekki, or ALL"></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-ghost" id="cancelAddUser">Cancel</button>
+        <button class="btn btn-primary" id="saveUserBtn">Create User</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Sites</h3>
+      <button class="btn btn-outline" id="addSiteBtn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Site</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Site Name</th><th>Location</th><th>Status</th></tr></thead>
+        <tbody id="siteRows"></tbody>
+      </table>
+    </div>
+    <div id="addSiteForm" style="display:none; margin-top:18px; border-top:1px solid var(--color-border); padding-top:16px;">
+      <div class="form-grid">
+        <div class="field"><label>Site Name</label><input type="text" id="newSiteName"></div>
+        <div class="field"><label>Location</label><input type="text" id="newSiteLocation"></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-ghost" id="cancelAddSite">Cancel</button>
+        <button class="btn btn-primary" id="saveSiteBtn">Create Site</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="audit" class="card">
+    <div class="card-head"><h3>Audit Log</h3></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Timestamp</th><th>Username</th><th>Action</th><th>Details</th></tr></thead>
+        <tbody id="auditRows"></tbody>
+      </table>
+    </div>
+  </div>
+</template>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/theme.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/categories.js"></script>
+<script src="js/dashboard.js"></script>
+</body>
+</html>

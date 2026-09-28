@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>
+  // Applied before first paint to avoid a flash of the wrong theme.
+  (function () {
+    var stored = localStorage.getItem('sems_theme');
+    var theme = stored || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  })();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Block Production — Site Expense Manager</title>
+<link rel="icon" type="image/png" href="assets/img/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/forms.css">
+<script src="js/chart-loader.js"></script>
+</head>
+<body>
+
+<template id="pageContent">
+  <div class="mobile-topbar">
+    <button id="menuBtn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+    <strong>Site Expense</strong>
+    <span></span>
+  </div>
+
+  <div class="topbar">
+    <div>
+      <h1>Block Production</h1>
+      <div class="sub">Blocks moulded, labour cost, and all other block production expenses — one page</div>
+    </div>
+    <button class="btn btn-primary" id="addEntryBtn" style="display:none;">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Log Today's Production
+    </button>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l9 5-9 5-9-5 9-5z"/><path d="M3 12l9 5 9-5M3 17l9 5 9-5"/></svg> Cement Used</div>
+      <div class="value primary" id="statCement">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M12 20V4M20 20v-7"/></svg> Blocks Produced</div>
+      <div class="value" id="statBlocks">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg> Avg Blocks / Bag</div>
+      <div class="value accent" id="statAvg">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg> Total Labour Cost</div>
+      <div class="value" id="statCost">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8M8 9h2"/></svg> Other Expenses</div>
+      <div class="value" id="statOther">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Grand Total Cost</div>
+      <div class="value primary" id="statGrandTotal" style="font-size:20px;">—</div>
+    </div>
+  </div>
+
+  <div id="addEntryForm" class="card" style="display:none;">
+    <div class="card-head"><h3>Section A — Log Production</h3></div>
+    <div class="form-grid">
+      <div class="field"><label>Date</label><input type="date" id="entryDate"></div>
+      <div class="field" id="entrySiteField"><label>Site</label><select id="entrySite"><option value="">Select a site…</option></select></div>
+      <div class="field"><label>Cement Used (bags)</label><input type="number" id="entryCement" min="0" placeholder="e.g. 25"></div>
+      <div class="field"><label>Blocks Produced</label><input type="number" id="entryBlocks" min="0" placeholder="e.g. 856"></div>
+      <div class="field"><label>Labour Rate / Bag (₦)</label><input type="number" id="entryRateBag" min="0" value="2900"></div>
+      <div class="field"><label>Rate / Piece (₦)</label><input type="number" id="entryRatePiece" min="0" value="100"></div>
+      <div class="field"><label>Pieces (if different from blocks produced)</label><input type="number" id="entryPieces" min="0" placeholder="Defaults to blocks produced"></div>
+      <div class="field span-2"><label>Notes (optional)</label><input type="text" id="entryNotes" placeholder="e.g. rained out mid-afternoon"></div>
+    </div>
+
+    <div class="preview-box" id="previewBox">
+      <div class="preview-row"><span>Avg per cement bag</span><strong id="prevAvg">—</strong></div>
+      <div class="preview-row total"><span>Total labour cost</span><strong id="prevTotal">—</strong></div>
+    </div>
+    <div class="field-hint" style="margin-bottom:14px;">This total posts automatically to Expenses under "Block Production" once you save — no need to log it again on Add Expense.</div>
+
+    <div class="form-actions">
+      <button class="btn btn-ghost" id="cancelAddEntry">Cancel</button>
+      <button class="btn btn-primary" id="saveEntryBtn">Save Entry</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Efficiency Trend</h3></div>
+    <div class="chart-box"><canvas id="trendChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Section A — Production Log</h3></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Site</th><th>Cement (Bags)</th><th>Blocks</th><th>Avg/Bag</th>
+            <th>Total Cost</th><th>Logged By</th>
+          </tr>
+        </thead>
+        <tbody id="entryRows"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="emptyState" style="display:none;">
+      <div class="icon"><svg class="ico ico-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l9 5-9 5-9-5 9-5z"/><path d="M3 12l9 5 9-5M3 17l9 5 9-5"/></svg></div>
+      <div>No production logged yet.</div>
+    </div>
+  </div>
+
+  <div class="topbar" style="margin-top:8px;">
+    <div>
+      <h3 style="margin:0;">Section B — Other Block Production Expenses</h3>
+      <div class="sub">Store construction, cement purchases, burnt bricks, water, sharp sand</div>
+    </div>
+    <button class="btn btn-primary" id="addOtherBtn" style="display:none;">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Log Expense
+    </button>
+  </div>
+
+  <div id="addOtherForm" class="card" style="display:none;">
+    <div class="form-grid">
+      <div class="field"><label>Date</label><input type="date" id="otherDate"></div>
+      <div class="field" id="otherSiteField"><label>Site</label><select id="otherSite"><option value="">Select a site…</option></select></div>
+      <div class="field"><label>Category</label>
+        <select id="otherCategory">
+          <option value="Store Construction">Store Construction</option>
+          <option value="Cement">Cement</option>
+          <option value="Burnt Bricks">Burnt Bricks</option>
+          <option value="Water Supply">Water Supply</option>
+          <option value="Sharp Sand">Sharp Sand</option>
+        </select>
+      </div>
+      <div class="field"><label>Description</label><input type="text" id="otherDescription" placeholder="e.g. 3 trips sharp sand for moulding"></div>
+      <div class="field"><label>Quantity</label><input type="number" id="otherQuantity" min="0" placeholder="e.g. 3"></div>
+      <div class="field"><label>Unit</label><input type="text" id="otherUnit" placeholder="e.g. trips, bags, tankers"></div>
+      <div class="field"><label>Unit Price (₦)</label><input type="number" id="otherUnitPrice" min="0" placeholder="e.g. 15000"></div>
+      <div class="field"><label>Amount (₦)</label><input type="number" id="otherAmount" min="0" placeholder="Auto-fills from Qty × Unit Price"></div>
+      <div class="field"><label>Vendor (optional)</label><input type="text" id="otherVendor" placeholder="e.g. Local Supplier"></div>
+      <div class="field"><label>Payment Method</label>
+        <select id="otherPayment">
+          <option value="Cash">Cash</option>
+          <option value="Transfer">Transfer</option>
+          <option value="Cheque">Cheque</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" id="cancelAddOther">Cancel</button>
+      <button class="btn btn-primary" id="saveOtherBtn">Save Expense</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>By Category</h3></div>
+    <div id="otherCategoryTotals" class="legend-list"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Section B — Expense Log</h3></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Site</th><th>Category</th><th>Description</th><th>Amount</th><th>Vendor</th><th>Payment</th>
+          </tr>
+        </thead>
+        <tbody id="otherRows"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="otherEmptyState" style="display:none;">
+      <div class="icon"><svg class="ico ico-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8M8 9h2"/></svg></div>
+      <div>No other block production expenses logged yet.</div>
+    </div>
+  </div>
+</template>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/theme.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/block-production.js"></script>
+</body>
+</html>

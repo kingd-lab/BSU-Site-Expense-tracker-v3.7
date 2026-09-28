@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>
+  // Applied before first paint to avoid a flash of the wrong theme.
+  (function () {
+    var stored = localStorage.getItem('sems_theme');
+    var theme = stored || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  })();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project Health — Site Expense Manager</title>
+<link rel="icon" type="image/png" href="assets/img/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/forms.css">
+</head>
+<body>
+
+<template id="pageContent">
+  <div class="mobile-topbar">
+    <button id="menuBtn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+    <strong>Site Expense</strong>
+    <span></span>
+  </div>
+
+  <div class="topbar">
+    <div>
+      <h1>Project Health</h1>
+      <div class="sub">Budget vs. actual spend, and whether each project is on track</div>
+    </div>
+    <button class="btn btn-primary" id="addProjectBtn" style="display:none;">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add Project
+    </button>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg> Total Budget</div>
+      <div class="value primary" id="statBudget">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M12 20V4M20 20v-7"/></svg> Total Spent</div>
+      <div class="value" id="statSpent">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg> Overall Utilisation</div>
+      <div class="value accent" id="statUtilisation">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/></svg> Status Mix</div>
+      <div class="value" id="statMix" style="font-size:15px;">—</div>
+    </div>
+  </div>
+
+  <div id="addProjectForm" class="card" style="display:none;">
+    <div class="card-head"><h3>New Project</h3></div>
+    <div class="form-grid">
+      <div class="field"><label>Project Name</label><input type="text" id="newProjName" placeholder="e.g. Lekki Phase 2"></div>
+      <div class="field"><label>Site</label><input type="text" id="newProjSite" placeholder="Must match an existing site name"></div>
+      <div class="field"><label>Budget (₦)</label><input type="number" id="newProjBudget" placeholder="e.g. 15000000"></div>
+      <div class="field"><label>Status</label>
+        <select id="newProjStatus">
+          <option>Active</option>
+          <option>On Hold</option>
+          <option>Completed</option>
+        </select>
+      </div>
+      <div class="field"><label>Start Date</label><input type="date" id="newProjStart"></div>
+      <div class="field"><label>End Date</label><input type="date" id="newProjEnd"></div>
+      <div class="field span-2"><label>Notes (optional)</label><input type="text" id="newProjNotes" placeholder="Scope, contract ref, anything worth remembering"></div>
+    </div>
+    <div class="field-hint" style="margin-bottom:14px;">Start and end dates are optional, but without them health is judged on budget alone — add them for a schedule-aware read (are we spending faster than the project is progressing?).</div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" id="cancelAddProject">Cancel</button>
+      <button class="btn btn-primary" id="saveProjectBtn">Create Project</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Projects</h3></div>
+    <div id="projectList" class="project-list"></div>
+    <div class="empty-state" id="emptyState" style="display:none;">
+      <div class="icon"><svg class="ico ico-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg></div>
+      <div>No projects yet. Add one to start tracking budget health.</div>
+    </div>
+  </div>
+</template>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/theme.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/projects.js"></script>
+</body>
+</html>

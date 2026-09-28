@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>
+  // Applied before first paint to avoid a flash of the wrong theme.
+  (function () {
+    var stored = localStorage.getItem('sems_theme');
+    var theme = stored || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  })();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Final Report — Site Expense Manager</title>
+<link rel="icon" type="image/png" href="assets/img/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<template id="pageContent">
+  <div class="mobile-topbar">
+    <button id="menuBtn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+    <strong>Site Expense</strong>
+    <span></span>
+  </div>
+
+  <div class="topbar">
+    <div>
+      <h1>Final Report</h1>
+      <div class="sub">Categorized summary, by-period breakdown, and full export — Admin &amp; Boss only</div>
+    </div>
+    <div class="export-row">
+      <button class="btn btn-primary" id="downloadExcelBtn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 19h16"/></svg> Download Full Report (Excel)</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Summary</h3>
+      <div class="sub" id="reportMeta" style="font-size:12.5px;color:var(--color-ink-muted);"></div>
+    </div>
+    <div class="table-wrap">
+      <table id="summaryTable">
+        <thead><tr><th>Category</th><th>Total (₦)</th><th>% of Total</th></tr></thead>
+        <tbody id="summaryRows"></tbody>
+      </table>
+    </div>
+    <div class="preview-box" style="margin-top:16px;">
+      <div class="preview-row"><span>Excavation / Foundation subtotal (control)</span><strong id="foundationSubtotal">—</strong></div>
+      <div class="preview-row total"><span>Grand Total</span><strong id="grandTotal">—</strong></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>By Period</h3></div>
+    <div class="table-wrap">
+      <table id="byPeriodTable">
+        <thead><tr id="byPeriodHead"></tr></thead>
+        <tbody id="byPeriodRows"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Block Production Cost Breakdown</h3></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Sheet</th><th>Transactions</th><th>Amount (₦)</th></tr></thead>
+        <tbody id="blockProdRows"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Category Detail</h3>
+      <select id="detailGroupSelect"></select>
+    </div>
+    <div class="table-wrap">
+      <table id="detailTable">
+        <thead><tr><th>Date</th><th>Detail Category</th><th>Description</th><th>Vendor</th><th>Amount</th><th>Payment Method</th></tr></thead>
+        <tbody id="detailRows"></tbody>
+      </table>
+      <div class="empty-state" id="detailEmpty" style="display:none;">No transactions in this category.</div>
+    </div>
+  </div>
+  <div class="card" id="recategorizeCard" style="display:none;">
+    <div class="card-head">
+      <h3>Fix Historical Categories</h3>
+      <div class="sub" style="font-size:12.5px;color:var(--color-ink-muted);">Admin only</div>
+    </div>
+    <p style="font-size:13px;color:var(--color-ink-muted);margin-bottom:14px;">
+      Older expenses may still be tagged with a single blanket category (e.g. everything under
+      "Excavation of Trenches") from before the current taxonomy existed. This re-checks each
+      expense's description against the current category list and proposes moving it to a more
+      specific category. Always preview first — nothing changes until you click Apply.
+    </p>
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
+      <select id="recatFromCategory"></select>
+      <button class="btn btn-outline" id="recatPreviewBtn">Preview Changes</button>
+      <button class="btn btn-primary" id="recatApplyBtn" style="display:none;">Apply Changes</button>
+    </div>
+    <div id="recatPreviewBox"></div>
+  </div>
+</template>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/theme.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/categories.js"></script>
+<script src="js/final-report.js"></script>
+</body>
+</html>

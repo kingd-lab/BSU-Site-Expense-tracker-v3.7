@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>
+  // Applied before first paint to avoid a flash of the wrong theme.
+  (function () {
+    var stored = localStorage.getItem('sems_theme');
+    var theme = stored || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  })();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Import Expenses — Site Expense Manager</title>
+<link rel="icon" type="image/png" href="assets/img/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/forms.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<template id="pageContent">
+  <div class="mobile-topbar">
+    <button id="menuBtn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+    <strong>Site Expense</strong>
+    <span></span>
+  </div>
+
+  <div class="topbar">
+    <div>
+      <h1>Import Expenses</h1>
+      <div class="sub">Upload an Excel sheet of daily expenses — categories are matched automatically, review before saving</div>
+    </div>
+  </div>
+
+  <div class="card" id="uploadCard">
+    <div class="card-head"><h3>Step 1 — Upload File</h3></div>
+
+    <div class="form-grid">
+      <div class="field" id="importSiteField">
+        <label>Site (applies to every row, unless your file has its own Site column)</label>
+        <select id="importSite"><option value="">Select a site…</option></select>
+      </div>
+      <div class="field">
+        <label>Excel / CSV File</label>
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+      </div>
+    </div>
+
+    <div class="field-hint">
+      Expected columns (any order, close matches are fine): <strong>Date</strong>, <strong>Category</strong> or <strong>Description</strong>,
+      <strong>Amount</strong>, and optionally Site, Vendor, Payment Method, Quantity, Unit.
+      No exact template required — the app looks for column headers that resemble these.
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-ghost" id="downloadTemplateBtn" type="button">Download a blank template</button>
+    </div>
+  </div>
+
+  <div class="card" id="reviewCard" style="display:none;">
+    <div class="card-head">
+      <h3>Step 2 — Review &amp; Fix Categories</h3>
+    </div>
+
+    <div class="stat-grid" style="margin-bottom:18px;">
+      <div class="stat-card">
+        <div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8M8 9h2"/></svg> Rows Found</div>
+        <div class="value primary" id="statRows">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Auto-Matched</div>
+        <div class="value accent" id="statMatched">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 21h20L12 2z"/><path d="M12 9v5M12 17h.01"/></svg> Needs Review</div>
+        <div class="value" id="statFlagged" style="color:#DD9827;">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg> Total Amount</div>
+        <div class="value" id="statTotal">—</div>
+      </div>
+    </div>
+
+    <div class="field-hint" style="margin-bottom:14px;">
+      Rows highlighted amber didn't confidently match a category — pick the right one from the dropdown before importing.
+      Every row is editable.
+    </div>
+
+    <div class="table-wrap">
+      <table id="reviewTable">
+        <thead>
+          <tr>
+            <th style="width:36px;"></th>
+            <th>Date</th><th>Site</th><th>Category</th><th>Description</th>
+            <th>Amount</th><th>Vendor</th><th>Payment</th>
+          </tr>
+        </thead>
+        <tbody id="reviewRows"></tbody>
+      </table>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-ghost" id="cancelImportBtn">Start Over</button>
+      <button class="btn btn-primary" id="confirmImportBtn">Import All Rows</button>
+    </div>
+  </div>
+</template>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/theme.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/categories.js"></script>
+<script src="js/import-expenses.js"></script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>
+  // Applied before first paint to avoid a flash of the wrong theme.
+  (function () {
+    var stored = localStorage.getItem('sems_theme');
+    var theme = stored || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  })();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reports — Site Expense Manager</title>
+<link rel="icon" type="image/png" href="assets/img/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<script src="js/chart-loader.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<template id="pageContent">
+  <div class="mobile-topbar">
+    <button id="menuBtn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+    <strong>Site Expense</strong>
+    <span></span>
+  </div>
+
+  <div class="topbar">
+    <div>
+      <h1>Reports</h1>
+      <div class="sub">Read-only view — expenses cannot be edited from here</div>
+    </div>
+    <div class="export-row">
+      <button class="btn btn-outline" id="exportExcelBtn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 19h16"/></svg> Export Excel</button>
+      <button class="btn btn-primary" id="exportPdfBtn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 19h16"/></svg> Export PDF</button>
+    </div>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card"><div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Total Expenses (All Time)</div><div class="value primary" id="statAllTime" style="font-size:22px;">—</div></div>
+    <div class="stat-card"><div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg> Today</div><div class="value" id="statToday">—</div></div>
+    <div class="stat-card"><div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg> This Month</div><div class="value" id="statMonth">—</div></div>
+    <div class="stat-card"><div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l9 5-9 5-9-5 9-5z"/><path d="M3 12l9 5 9-5M3 17l9 5 9-5"/></svg> Sites</div><div class="value accent" id="statSites">—</div></div>
+    <div class="stat-card"><div class="label"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8M8 9h2"/></svg> Transactions</div><div class="value" id="statCount">—</div></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-head"><h3>Monthly Spend Trend</h3></div>
+      <div class="chart-box"><canvas id="monthChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>Spend by Category</h3></div>
+      <div class="chart-box"><canvas id="categoryChart"></canvas></div>
+      <div class="legend-list" id="categoryLegend" style="margin-top:14px;"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Spend by Site</h3></div>
+    <div class="chart-box" style="height:240px;"><canvas id="siteChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Summary by Group</h3></div>
+    <div class="legend-list" id="groupSummary" style="margin-top:4px;"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>All Expenses</h3>
+    </div>
+    <div class="filter-row">
+      <input type="text" id="searchBox" placeholder="Search description, vendor…">
+      <select id="siteFilter"><option value="">All sites</option></select>
+      <select id="categoryFilter"><option value="">All categories</option></select>
+      <select id="groupFilter"><option value="">All groups (Hotel, Accommodation, etc.)</option></select>
+      <input type="date" id="fromDate">
+      <input type="date" id="toDate">
+    </div>
+    <div class="table-wrap">
+      <table id="reportTable">
+        <thead>
+          <tr>
+            <th>Expense ID</th><th>Date</th><th>Site</th><th>Category</th><th>Description</th>
+            <th>Amount</th><th>Vendor</th><th>Payment</th><th>Submitted By</th>
+          </tr>
+        </thead>
+        <tbody id="expenseRows"></tbody>
+      </table>
+      <div class="empty-state" id="emptyState" style="display:none;">
+        <div class="icon"><svg class="ico ico-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg></div><div>No expenses match your filters.</div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/theme.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/categories.js"></script>
+<script src="js/report.js"></script>
+</body>
+</html>
